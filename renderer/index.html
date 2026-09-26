@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ByAzenB Browser</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app" class="theme-light">
+    <!-- Панель вкладок -->
+    <div id="tabs-bar">
+      <div id="tabs-container"></div>
+      <button id="new-tab-btn" title="Новая вкладка (Ctrl+T)">+</button>
+      <div class="window-controls-spacer"></div>
+    </div>
+
+    <!-- Панель навигации -->
+    <div id="nav-bar">
+      <div class="nav-group">
+        <button id="back-btn" class="nav-btn" title="Назад (Alt+←)">←</button>
+        <button id="forward-btn" class="nav-btn" title="Вперед (Alt+→)">→</button>
+        <button id="reload-btn" class="nav-btn" title="Обновить (Ctrl+R)">↻</button>
+        <button id="home-btn" class="nav-btn" title="Домой">⌂</button>
+      </div>
+
+      <div id="omnibox-wrapper">
+        <span id="security-icon" title="Безопасность">🔒</span>
+        <input id="omnibox" type="text" placeholder="Введите адрес или поисковый запрос" spellcheck="false">
+        <button id="bookmark-star" title="Добавить закладку (Ctrl+D)">☆</button>
+      </div>
+
+      <div class="nav-group">
+        <button id="downloads-btn" class="nav-btn" title="Загрузки (Ctrl+J)">⭳</button>
+        <button id="history-btn" class="nav-btn" title="История (Ctrl+H)">🕘</button>
+        <button id="bookmarks-btn" class="nav-btn" title="Закладки">★</button>
+        <button id="menu-btn" class="nav-btn" title="Меню">☰</button>
+      </div>
+    </div>
+
+    <!-- Панель закладок -->
+    <div id="bookmarks-bar"></div>
+
+    <!-- Прогресс загрузки -->
+    <div id="progress-bar"><div id="progress-fill"></div></div>
+
+    <!-- Контент страниц браузера (история, загрузки, настройки, новая вкладка) -->
+    <div id="internal-pages">
+      <!-- Новая вкладка -->
+      <div id="page-newtab" class="internal-page active">
+        <div class="newtab-content">
+          <h1 class="newtab-logo">ByAzenB</h1>
+          <div class="newtab-search">
+            <input id="newtab-search-input" type="text" placeholder="Поиск в Google или ввод адреса">
+            <button id="newtab-search-btn">Поиск</button>
+          </div>
+          <div class="newtab-shortcuts">
+            <h3>Быстрый доступ</h3>
+            <div id="newtab-shortcuts-grid"></div>
+          </div>
+          <div class="newtab-info">
+            <p>🔒 Защищенный браузер на базе Chromium</p>
+            <p>Версия 1.0.0 | Electron <span id="electron-version"></span></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- История -->
+      <div id="page-history" class="internal-page">
+        <div class="page-header">
+          <h2>История</h2>
+          <div class="page-actions">
+            <input id="history-search" type="text" placeholder="Поиск в истории">
+            <button id="history-clear" class="danger-btn">Очистить историю</button>
+            <button class="close-page-btn" data-page="history">✕</button>
+          </div>
+        </div>
+        <div id="history-list" class="list-container"></div>
+      </div>
+
+      <!-- Закладки -->
+      <div id="page-bookmarks" class="internal-page">
+        <div class="page-header">
+          <h2>Закладки</h2>
+          <div class="page-actions">
+            <button class="close-page-btn" data-page="bookmarks">✕</button>
+          </div>
+        </div>
+        <div id="bookmarks-list" class="list-container"></div>
+      </div>
+
+      <!-- Загрузки -->
+      <div id="page-downloads" class="internal-page">
+        <div class="page-header">
+          <h2>Загрузки</h2>
+          <div class="page-actions">
+            <button id="downloads-clear" class="danger-btn">Очистить</button>
+            <button id="downloads-open-folder" class="secondary-btn">Открыть папку</button>
+            <button class="close-page-btn" data-page="downloads">✕</button>
+          </div>
+        </div>
+        <div id="downloads-list" class="list-container"></div>
+      </div>
+
+      <!-- Настройки -->
+      <div id="page-settings" class="internal-page">
+        <div class="page-header">
+          <h2>Настройки</h2>
+          <div class="page-actions">
+            <button class="close-page-btn" data-page="settings">✕</button>
+          </div>
+        </div>
+        <div class="settings-container">
+          <div class="settings-section">
+            <h3>Основные</h3>
+            <label>Домашняя страница
+              <input id="setting-homepage" type="text">
+            </label>
+            <label>Поисковая система
+              <select id="setting-search-engine">
+                <option value="https://www.google.com/search?q=%s">Google</option>
+                <option value="https://duckduckgo.com/?q=%s">DuckDuckGo</option>
+                <option value="https://www.bing.com/search?q=%s">Bing</option>
+                <option value="https://yandex.ru/search/?text=%s">Yandex</option>
+                <option value="https://search.brave.com/search?q=%s">Brave Search</option>
+              </select>
+            </label>
+            <label>Папка загрузок
+              <div class="input-with-btn">
+                <input id="setting-download-path" type="text" readonly>
+                <button id="setting-browse-download">Обзор</button>
+              </div>
+            </label>
+          </div>
+
+          <div class="settings-section">
+            <h3>Внешний вид</h3>
+            <label class="checkbox-label">
+              <input id="setting-dark-mode" type="checkbox"> Тёмная тема
+            </label>
+            <label class="checkbox-label">
+              <input id="setting-adblock" type="checkbox"> Базовая блокировка рекламы
+            </label>
+          </div>
+
+          <div class="settings-section">
+            <h3>Приватность</h3>
+            <button id="btn-clear-history" class="danger-btn">Очистить историю</button>
+            <button id="btn-new-incognito" class="secondary-btn">Новое окно инкогнито (Ctrl+Shift+N)</button>
+            <p class="hint">Инкогнито: не сохраняет историю, куки удаляются после закрытия.</p>
+          </div>
+
+          <div class="settings-section">
+            <h3>О браузере</h3>
+            <p><strong>ByAzenB Browser</strong> v1.0.0</p>
+            <p>Стек: Electron <span id="settings-electron-ver"></span> + Chromium</p>
+            <p>Лицензия: MIT</p>
+            <p>GitHub зависимости:</p>
+            <ul>
+              <li><a href="#" data-link="https://github.com/electron/electron">electron/electron</a> (MIT) — основа браузера</li>
+              <li><a href="#" data-link="https://github.com/electron-userland/electron-builder">electron-builder</a> (MIT) — сборка</li>
+            </ul>
+            <div class="shortcuts-help">
+              <h4>Горячие клавиши</h4>
+              <div class="shortcut"><span>Ctrl+T</span> Новая вкладка</div>
+              <div class="shortcut"><span>Ctrl+W</span> Закрыть вкладку</div>
+              <div class="shortcut"><span>Ctrl+L</span> Фокус на адресную строку</div>
+              <div class="shortcut"><span>Ctrl+R</span> Обновить</div>
+              <div class="shortcut"><span>Ctrl+H</span> История</div>
+              <div class="shortcut"><span>Ctrl+J</span> Загрузки</div>
+              <div class="shortcut"><span>Ctrl+D</span> Закладка</div>
+              <div class="shortcut"><span>Ctrl+Shift+I</span> DevTools</div>
+              <div class="shortcut"><span>Ctrl+Shift+N</span> Инкогнито</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Панель поиска на странице -->
+    <div id="find-bar" class="hidden">
+      <input id="find-input" type="text" placeholder="Найти на странице">
+      <span id="find-count"></span>
+      <button id="find-prev">↑</button>
+      <button id="find-next">↓</button>
+      <button id="find-close">✕</button>
+    </div>
+
+    <!-- Контекстное меню браузера -->
+    <div id="browser-menu" class="hidden">
+      <div class="menu-item" data-action="new-tab">Новая вкладка <span>Ctrl+T</span></div>
+      <div class="menu-item" data-action="new-incognito">Новое инкогнито окно <span>Ctrl+Shift+N</span></div>
+      <div class="menu-sep"></div>
+      <div class="menu-item" data-action="history">История <span>Ctrl+H</span></div>
+      <div class="menu-item" data-action="downloads">Загрузки <span>Ctrl+J</span></div>
+      <div class="menu-item" data-action="bookmarks">Закладки</div>
+      <div class="menu-sep"></div>
+      <div class="menu-item" data-action="find">Найти на странице <span>Ctrl+F</span></div>
+      <div class="menu-item" data-action="devtools">Инструменты разработчика <span>Ctrl+Shift+I</span></div>
+      <div class="menu-item" data-action="zoom-in">Увеличить</div>
+      <div class="menu-item" data-action="zoom-out">Уменьшить</div>
+      <div class="menu-item" data-action="zoom-reset">Сбросить масштаб</div>
+      <div class="menu-sep"></div>
+      <div class="menu-item" data-action="settings">Настройки <span>Ctrl+,</span></div>
+    </div>
+
+    <!-- Индикатор инкогнито -->
+    <div id="incognito-badge" class="hidden">🕶️ Инкогнито</div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
