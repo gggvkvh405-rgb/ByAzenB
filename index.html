@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ByAzenB Browser — Preview UI</title>
+<style>
+:root {
+  --bg: #ffffff;
+  --bg-secondary: #f1f3f4;
+  --bg-tertiary: #e8eaed;
+  --text: #202124;
+  --text-secondary: #5f6368;
+  --border: #dadce0;
+  --accent: #1a73e8;
+  --accent-hover: #1765cc;
+  --tab-active: #ffffff;
+  --tab-inactive: #f1f3f4;
+  --danger: #d93025;
+  --shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); overflow: hidden; user-select: none; height: 100vh; display: flex; flex-direction: column; }
+button { cursor: pointer; font-family: inherit; }
+input, select { font-family: inherit; }
+
+/* Tabs bar */
+#tabs-bar { display: flex; align-items: center; background: var(--bg-secondary); border-bottom: 1px solid var(--border); height: 40px; padding: 0 8px; gap: 4px; }
+#tabs-container { display: flex; flex: 1; overflow-x: auto; gap: 2px; scrollbar-width: none; }
+#tabs-container::-webkit-scrollbar { display: none; }
+.tab { display: flex; align-items: center; gap: 6px; min-width: 120px; max-width: 220px; height: 32px; padding: 0 10px; background: var(--tab-inactive); border-radius: 8px 8px 0 0; border: 1px solid transparent; cursor: pointer; flex: 1; position: relative; }
+.tab.active { background: var(--tab-active); border-color: var(--border); box-shadow: var(--shadow); }
+.tab:hover { background: var(--bg-tertiary); }
+.tab.active:hover { background: var(--tab-active); }
+.tab-favicon { width: 16px; height: 16px; flex-shrink: 0; font-size: 14px; }
+.tab-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.tab-close { width: 18px; height: 18px; border-radius: 50%; border: none; background: transparent; display: flex; align-items: center; justify-content: center; font-size: 12px; opacity: 0.6; }
+.tab-close:hover { background: var(--border); opacity: 1; }
+.tab.incognito { border-left: 3px solid #9c27b0; }
+#new-tab-btn { width: 28px; height: 28px; border-radius: 50%; border: none; background: transparent; font-size: 18px; }
+#new-tab-btn:hover { background: var(--bg-tertiary); }
+
+/* Nav bar */
+#nav-bar { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: var(--bg); border-bottom: 1px solid var(--border); height: 44px; }
+.nav-group { display: flex; gap: 2px; }
+.nav-btn { width: 32px; height: 32px; border-radius: 50%; border: none; background: transparent; font-size: 16px; display: flex; align-items: center; justify-content: center; }
+.nav-btn:hover { background: var(--bg-secondary); }
+.nav-btn:disabled { opacity: 0.3; }
+#omnibox-wrapper { flex: 1; display: flex; align-items: center; gap: 6px; background: var(--bg-secondary); border-radius: 24px; padding: 0 14px; height: 36px; border: 1px solid transparent; transition: all 0.2s; }
+#omnibox-wrapper:focus-within { background: var(--bg); border-color: var(--accent); box-shadow: 0 1px 6px rgba(32,33,36,0.15); }
+#omnibox { flex: 1; border: none; background: transparent; outline: none; font-size: 14px; color: var(--text); }
+#bookmark-star { border: none; background: transparent; font-size: 18px; width: 24px; }
+#bookmark-star.bookmarked { color: #fbbc04; }
+
+/* Bookmarks bar */
+#bookmarks-bar { display: flex; align-items: center; gap: 4px; padding: 4px 10px; background: var(--bg); border-bottom: 1px solid var(--border); height: 32px; overflow-x: auto; scrollbar-width: none; }
+.bookmark-item { display: flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 12px; background: transparent; border: none; font-size: 12px; white-space: nowrap; max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+.bookmark-item:hover { background: var(--bg-secondary); }
+
+/* Progress */
+#progress-bar { height: 2px; background: transparent; position: relative; overflow: hidden; }
+#progress-fill { height: 100%; width: 0%; background: var(--accent); transition: width 0.2s; }
+
+/* Content */
+#content-area { flex: 1; position: relative; overflow: hidden; background: var(--bg); display: flex; }
+#webview-placeholder { flex: 1; border: none; background: white; }
+#internal-pages { position: absolute; inset: 0; background: var(--bg); overflow: hidden; display: none; z-index: 2; }
+#internal-pages.active { display: block; }
+.internal-page { position: absolute; inset: 0; overflow-y: auto; background: var(--bg); display: none; padding: 0; }
+.internal-page.active { display: block; }
+.page-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--bg); z-index: 1; }
+.page-header h2 { font-size: 22px; font-weight: 400; }
+.page-actions { display: flex; gap: 8px; align-items: center; }
+.page-actions input { padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-secondary); color: var(--text); min-width: 200px; }
+.close-page-btn { width: 32px; height: 32px; border-radius: 50%; border: none; background: transparent; font-size: 16px; }
+.close-page-btn:hover { background: var(--bg-secondary); }
+
+/* New Tab */
+.newtab-content { max-width: 800px; margin: 60px auto; padding: 0 24px; text-align: center; }
+.newtab-logo { font-size: 48px; font-weight: 300; letter-spacing: -1px; margin-bottom: 30px; background: linear-gradient(90deg, #1a73e8, #34a853, #fbbc04, #ea4335); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.newtab-search { display: flex; gap: 8px; max-width: 600px; margin: 0 auto 40px; }
+.newtab-search input { flex: 1; padding: 14px 20px; border-radius: 24px; border: 1px solid var(--border); font-size: 16px; background: var(--bg); color: var(--text); box-shadow: var(--shadow); outline: none; }
+.newtab-search button { padding: 0 24px; border-radius: 24px; border: none; background: var(--accent); color: white; font-size: 14px; }
+.shortcut-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 12px; margin-top: 16px; text-align: left; }
+.shortcut-card { padding: 16px; border-radius: 12px; background: var(--bg-secondary); border: 1px solid var(--border); cursor: pointer; text-align: center; transition: transform 0.1s; }
+.shortcut-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+.shortcut-card .icon { font-size: 24px; margin-bottom: 8px; }
+.shortcut-card .label { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Lists */
+.list-container { padding: 12px 24px; }
+.history-item, .bookmark-list-item, .download-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 8px; border-bottom: 1px solid var(--border); cursor: pointer; }
+.history-item:hover, .bookmark-list-item:hover, .download-item:hover { background: var(--bg-secondary); }
+.item-actions { display: flex; gap: 4px; margin-left: auto; }
+.item-actions button { padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); font-size: 11px; }
+
+/* Find bar */
+#find-bar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--bg-secondary); border-top: 1px solid var(--border); position: absolute; bottom: 0; right: 20px; border-radius: 8px 8px 0 0; box-shadow: var(--shadow); z-index: 10; }
+#find-bar.hidden { display: none; }
+
+/* Menu */
+#browser-menu { position: absolute; top: 84px; right: 10px; width: 300px; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); z-index: 20; padding: 8px 0; }
+#browser-menu.hidden { display: none; }
+.menu-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; font-size: 13px; cursor: pointer; }
+.menu-item:hover { background: var(--bg-secondary); }
+.menu-item span { color: var(--text-secondary); font-size: 11px; }
+.menu-sep { height: 1px; background: var(--border); margin: 6px 0; }
+
+#incognito-badge { position: absolute; top: 100px; left: 50%; transform: translateX(-50%); background: #3c4043; color: white; padding: 6px 14px; border-radius: 16px; font-size: 12px; z-index: 5; }
+#incognito-badge.hidden { display: none; }
+
+.settings-container { max-width: 800px; padding: 20px 24px; }
+.settings-section { margin-bottom: 24px; padding: 20px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-secondary); }
+.settings-section h3 { margin-bottom: 12px; }
+.settings-section label { display: block; margin-bottom: 12px; font-size: 14px; }
+.settings-section input[type="text"], .settings-section select { display: block; width: 100%; margin-top: 6px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); }
+
+.danger-btn { padding: 8px 16px; border-radius: 8px; border: 1px solid var(--danger); background: transparent; color: var(--danger); }
+.secondary-btn { padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); }
+</style>
+</head>
+<body>
+
+<!-- Tabs -->
+<div id="tabs-bar">
+  <div id="tabs-container"></div>
+  <button id="new-tab-btn" title="Новая вкладка">+</button>
+</div>
+
+<!-- Nav -->
+<div id="nav-bar">
+  <div class="nav-group">
+    <button class="nav-btn" id="back-btn">←</button>
+    <button class="nav-btn" id="forward-btn">→</button>
+    <button class="nav-btn" id="reload-btn">↻</button>
+    <button class="nav-btn" id="home-btn">⌂</button>
+  </div>
+  <div id="omnibox-wrapper">
+    <span id="security-icon">🔒</span>
+    <input id="omnibox" type="text" placeholder="Введите адрес или поисковый запрос">
+    <button id="bookmark-star">☆</button>
+  </div>
+  <div class="nav-group">
+    <button class="nav-btn" id="downloads-btn" title="Загрузки">⭳</button>
+    <button class="nav-btn" id="history-btn" title="История">🕘</button>
+    <button class="nav-btn" id="bookmarks-btn" title="Закладки">★</button>
+    <button class="nav-btn" id="menu-btn" title="Меню">☰</button>
+  </div>
+</div>
+
+<div id="bookmarks-bar"></div>
+<div id="progress-bar"><div id="progress-fill"></div></div>
+
+<!-- Content -->
+<div id="content-area">
+  <iframe id="webview-placeholder" src="https://www.google.com/search?igu=1&source=hp&q=ByAzenB+Browser"></iframe>
+
+  <div id="internal-pages">
+    <!-- New Tab -->
+    <div id="page-newtab" class="internal-page active">
+      <div class="newtab-content">
+        <h1 class="newtab-logo">ByAzenB</h1>
+        <div class="newtab-search">
+          <input id="newtab-search-input" type="text" placeholder="Поиск в Google или ввод адреса">
+          <button id="newtab-search-btn">Поиск</button>
+        </div>
+        <div style="text-align:left">
+          <h3 style="font-weight:400;color:var(--text-secondary)">Быстрый доступ</h3>
+          <div id="newtab-shortcuts" class="shortcut-grid"></div>
+        </div>
+        <p style="margin-top:40px;color:var(--text-secondary);font-size:12px">🔒 Защищенный браузер на Chromium • Демо интерфейс • Полная версия работает в Electron</p>
+      </div>
+    </div>
+
+    <!-- History -->
+    <div id="page-history" class="internal-page">
+      <div class="page-header"><h2>История</h2><div class="page-actions"><input placeholder="Поиск в истории"><button class="danger-btn">Очистить</button><button class="close-page-btn" data-close="history">✕</button></div></div>
+      <div id="history-list" class="list-container"></div>
+    </div>
+
+    <!-- Bookmarks -->
+    <div id="page-bookmarks" class="internal-page">
+      <div class="page-header"><h2>Закладки</h2><div class="page-actions"><button class="close-page-btn" data-close="bookmarks">✕</button></div></div>
+      <div id="bookmarks-list" class="list-container"></div>
+    </div>
+
+    <!-- Downloads -->
+    <div id="page-downloads" class="internal-page">
+      <div class="page-header"><h2>Загрузки</h2><div class="page-actions"><button class="secondary-btn">Открыть папку</button><button class="close-page-btn" data-close="downloads">✕</button></div></div>
+      <div id="downloads-list" class="list-container"></div>
+    </div>
+
+    <!-- Settings -->
+    <div id="page-settings" class="internal-page">
+      <div class="page-header"><h2>Настройки</h2><div class="page-actions"><button class="close-page-btn" data-close="settings">✕</button></div></div>
+      <div class="settings-container">
+        <div class="settings-section"><h3>Основные</h3><label>Домашняя страница<input type="text" value="https://www.google.com"></label><label>Поисковая система<select><option>Google</option><option>DuckDuckGo</option><option>Bing</option><option>Yandex</option></select></label></div>
+        <div class="settings-section"><h3>Внешний вид</h3><label><input type="checkbox"> Тёмная тема</label><label><input type="checkbox" checked> Базовая блокировка рекламы</label></div>
+        <div class="settings-section"><h3>О браузере</h3><p><strong>ByAzenB Browser v1.0.0</strong></p><p>Electron + Chromium • MIT</p><p>GitHub: electron/electron, electron-builder</p></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="find-bar" class="hidden">
+    <input placeholder="Найти на странице" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px">
+    <button>↑</button><button>↓</button><button id="find-close">✕</button>
+  </div>
+
+  <div id="browser-menu" class="hidden">
+    <div class="menu-item" data-action="new-tab">Новая вкладка <span>Ctrl+T</span></div>
+    <div class="menu-item">Новое инкогнито окно <span>Ctrl+Shift+N</span></div>
+    <div class="menu-sep"></div>
+    <div class="menu-item" data-action="history">История <span>Ctrl+H</span></div>
+    <div class="menu-item" data-action="downloads">Загрузки <span>Ctrl+J</span></div>
+    <div class="menu-item" data-action="bookmarks">Закладки</div>
+    <div class="menu-sep"></div>
+    <div class="menu-item">Найти <span>Ctrl+F</span></div>
+    <div class="menu-item">Инструменты разработчика <span>Ctrl+Shift+I</span></div>
+    <div class="menu-sep"></div>
+    <div class="menu-item" data-action="settings">Настройки <span>Ctrl+,</span></div>
+  </div>
+
+  <div id="incognito-badge" class="hidden">🕶️ Инкогнито</div>
+</div>
+
+<script>
+// Mock data
+let tabs = [
+  {id:1, title:'Новая вкладка', url:'byazenb://newtab', favicon:'🌐', incognito:false},
+  {id:2, title:'Google', url:'https://google.com', favicon:'🔍', incognito:false},
+  {id:3, title:'GitHub - ByAzenB', url:'https://github.com', favicon:'🐙', incognito:false},
+];
+let activeId = 1;
+let tabCounter = 3;
+let bookmarks = [
+  {title:'Google', url:'https://google.com'},
+  {title:'YouTube', url:'https://youtube.com'},
+  {title:'GitHub', url:'https://github.com'},
+  {title:'Habr', url:'https://habr.com'},
+  {title:'Wikipedia', url:'https://wikipedia.org'},
+];
+let historyItems = [
+  {title:'ByAzenB Browser - GitHub', url:'https://github.com/gggvkvh405-rgb/ByAzenB', time:'Сегодня 12:30'},
+  {title:'Google', url:'https://google.com', time:'Сегодня 11:45'},
+  {title:'YouTube', url:'https://youtube.com', time:'Сегодня 10:20'},
+  {title:'Stack Overflow', url:'https://stackoverflow.com', time:'Вчера 18:15'},
+  {title:'Habr', url:'https://habr.com', time:'Вчера 16:00'},
+];
+let downloads = [
+  {name:'ByAzenB-Setup.exe', size:'85.2 MB', state:'Завершено'},
+  {name:'document.pdf', size:'2.4 MB', state:'Завершено'},
+  {name:'image.png', size:'1.1 MB', state:'45%'},
+];
+
+const els = {
+  tabsContainer: document.getElementById('tabs-container'),
+  omnibox: document.getElementById('omnibox'),
+  webview: document.getElementById('webview-placeholder'),
+  bookmarksBar: document.getElementById('bookmarks-bar'),
+  internalPages: document.getElementById('internal-pages'),
+  newtabShortcuts: document.getElementById('newtab-shortcuts'),
+  historyList: document.getElementById('history-list'),
+  bookmarksList: document.getElementById('bookmarks-list'),
+  downloadsList: document.getElementById('downloads-list'),
+  browserMenu: document.getElementById('browser-menu'),
+  findBar: document.getElementById('find-bar'),
+};
+
+function renderTabs(){
+  els.tabsContainer.innerHTML='';
+  tabs.forEach(t=>{
+    const div=document.createElement('div');
+    div.className=`tab ${t.id===activeId?'active':''} ${t.incognito?'incognito':''}`;
+    div.innerHTML=`<span class="tab-favicon">${t.favicon}</span><span class="tab-title">${t.title}</span><button class="tab-close">✕</button>`;
+    div.addEventListener('click',e=>{
+      if(e.target.classList.contains('tab-close')){closeTab(t.id);return;}
+      switchTab(t.id);
+    });
+    els.tabsContainer.appendChild(div);
+  });
+}
+function switchTab(id){
+  activeId=id;
+  const tab=tabs.find(x=>x.id===id);
+  if(!tab)return;
+  els.omnibox.value=tab.url;
+  renderTabs();
+  if(tab.url.startsWith('byazenb://')){
+    els.internalPages.classList.add('active');
+    document.querySelectorAll('.internal-page').forEach(p=>p.classList.remove('active'));
+    document.getElementById('page-newtab').classList.add('active');
+    els.webview.style.display='none';
+  } else {
+    els.internalPages.classList.remove('active');
+    els.webview.style.display='block';
+    // try load url in iframe, fallback to google search if blocked
+    try{ els.webview.src=tab.url; }catch(e){}
+  }
+}
+function closeTab(id){
+  tabs=tabs.filter(t=>t.id!==id);
+  if(tabs.length===0){createTab('byazenb://newtab');}
+  if(activeId===id){activeId=tabs[tabs.length-1].id; switchTab(activeId);} else renderTabs();
+}
+function createTab(url){
+  tabCounter++;
+  const isNew = url.includes('newtab');
+  tabs.push({id:tabCounter, title: isNew?'Новая вкладка':'Новый сайт', url:url, favicon:isNew?'🌐':'🔗', incognito:false});
+  switchTab(tabCounter);
+}
+function resolveUrl(input){
+  input=input.trim();
+  if(!input) return 'https://google.com';
+  if(input.startsWith('http')||input.startsWith('byazenb://')) return input;
+  if(input.includes('.') && !input.includes(' ')) return 'https://'+input;
+  return 'https://www.google.com/search?q='+encodeURIComponent(input)+'&igu=1';
+}
+function renderBookmarksBar(){
+  els.bookmarksBar.innerHTML='';
+  bookmarks.forEach(b=>{
+    const btn=document.createElement('button');
+    btn.className='bookmark-item';
+    btn.textContent='⭐ '+b.title;
+    btn.title=b.url;
+    btn.onclick=()=>{navigateTo(b.url);};
+    els.bookmarksBar.appendChild(btn);
+  });
+}
+function renderNewTabShortcuts(){
+  els.newtabShortcuts.innerHTML='';
+  [...bookmarks, {title:'Google',url:'https://google.com',icon:'🔍'},{title:'YouTube',url:'https://youtube.com',icon:'▶️'}].slice(0,8).forEach(s=>{
+    const card=document.createElement('div');
+    card.className='shortcut-card';
+    card.innerHTML=`<div class="icon">${s.icon||'🌐'}</div><div class="label">${s.title}</div>`;
+    card.onclick=()=>navigateTo(s.url);
+    els.newtabShortcuts.appendChild(card);
+  });
+}
+function renderHistory(){
+  els.historyList.innerHTML='';
+  historyItems.forEach(h=>{
+    const div=document.createElement('div');
+    div.className='history-item';
+    div.innerHTML=`<span>🌐</span><div><div style="font-size:14px">${h.title}</div><div style="font-size:12px;color:var(--text-secondary)">${h.url}</div></div><span style="margin-left:auto;font-size:11px;color:var(--text-secondary)">${h.time}</span>`;
+    div.onclick=()=>navigateTo(h.url);
+    els.historyList.appendChild(div);
+  });
+}
+function renderBookmarksPage(){
+  els.bookmarksList.innerHTML='';
+  bookmarks.forEach(b=>{
+    const div=document.createElement('div');
+    div.className='bookmark-list-item';
+    div.innerHTML=`<span>⭐</span><div><div>${b.title}</div><div style="font-size:12px;color:var(--text-secondary)">${b.url}</div></div><div class="item-actions"><button>Открыть</button><button>Удалить</button></div>`;
+    div.querySelector('button').onclick=()=>navigateTo(b.url);
+    els.bookmarksList.appendChild(div);
+  });
+}
+function renderDownloads(){
+  els.downloadsList.innerHTML='';
+  downloads.forEach(d=>{
+    const div=document.createElement('div');
+    div.className='download-item';
+    div.innerHTML=`<span>📄</span><div><div>${d.name} — ${d.state}</div><div style="font-size:12px;color:var(--text-secondary)">${d.size}</div></div><div class="item-actions"><button>Открыть</button><button>Папка</button></div>`;
+    els.downloadsList.appendChild(div);
+  });
+}
+function navigateTo(input){
+  const url=resolveUrl(input);
+  const tab=tabs.find(t=>t.id===activeId);
+  if(tab){tab.url=url; tab.title=input; els.omnibox.value=url;}
+  if(url.startsWith('byazenb://')){
+    els.internalPages.classList.add('active');
+    document.querySelectorAll('.internal-page').forEach(p=>p.classList.remove('active'));
+    document.getElementById('page-newtab').classList.add('active');
+    els.webview.style.display='none';
+  } else {
+    els.internalPages.classList.remove('active');
+    els.webview.style.display='block';
+    els.webview.src=url;
+  }
+  renderTabs();
+}
+function showInternal(page){
+  els.internalPages.classList.add('active');
+  document.querySelectorAll('.internal-page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+page).classList.add('active');
+  els.webview.style.display='none';
+  if(page==='history') renderHistory();
+  if(page==='bookmarks') renderBookmarksPage();
+  if(page==='downloads') renderDownloads();
+}
+function hideInternal(){
+  els.internalPages.classList.remove('active');
+  els.webview.style.display='block';
+}
+
+// Events
+document.getElementById('new-tab-btn').onclick=()=>createTab('byazenb://newtab');
+document.getElementById('back-btn').onclick=()=>{try{els.webview.contentWindow.history.back();}catch(e){}};
+document.getElementById('forward-btn').onclick=()=>{try{els.webview.contentWindow.history.forward();}catch(e){}};
+document.getElementById('reload-btn').onclick=()=>{els.webview.src=els.webview.src;};
+document.getElementById('home-btn').onclick=()=>navigateTo('https://www.google.com');
+els.omnibox.addEventListener('keydown',e=>{if(e.key==='Enter') navigateTo(e.target.value);});
+document.getElementById('newtab-search-input').addEventListener('keydown',e=>{if(e.key==='Enter') navigateTo(e.target.value);});
+document.getElementById('newtab-search-btn').onclick=()=>navigateTo(document.getElementById('newtab-search-input').value);
+document.getElementById('history-btn').onclick=()=>showInternal('history');
+document.getElementById('bookmarks-btn').onclick=()=>showInternal('bookmarks');
+document.getElementById('downloads-btn').onclick=()=>showInternal('downloads');
+document.getElementById('menu-btn').onclick=(e)=>{e.stopPropagation(); els.browserMenu.classList.toggle('hidden');};
+document.addEventListener('click',e=>{if(!els.browserMenu.contains(e.target) && e.target.id!=='menu-btn') els.browserMenu.classList.add('hidden');});
+document.querySelectorAll('.close-page-btn').forEach(b=>b.onclick=()=>hideInternal());
+document.getElementById('find-close').onclick=()=>els.findBar.classList.add('hidden');
+document.querySelectorAll('.menu-item').forEach(item=>{
+  item.onclick=()=>{
+    const act=item.dataset.action;
+    els.browserMenu.classList.add('hidden');
+    if(act==='new-tab') createTab('byazenb://newtab');
+    if(act==='history') showInternal('history');
+    if(act==='downloads') showInternal('downloads');
+    if(act==='bookmarks') showInternal('bookmarks');
+    if(act==='settings') showInternal('settings');
+  };
+});
+document.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='t'){e.preventDefault(); createTab('byazenb://newtab');}
+  if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='f'){e.preventDefault(); els.findBar.classList.remove('hidden');}
+  if(e.key==='Escape'){els.findBar.classList.add('hidden'); if(els.internalPages.classList.contains('active')) hideInternal();}
+});
+
+// Init
+renderTabs(); renderBookmarksBar(); renderNewTabShortcuts(); switchTab(1);
+</script>
+</body>
+</html>
