@@ -91,7 +91,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set +e
-          APK="dist/Klinok-i-Monety-Kuznitsa-Khaosa.apk"
+          APK="Klinok-i-Monety-Kuznitsa-Khaosa.apk"
           gh release view apk --repo "${GITHUB_REPOSITORY}" > /dev/null 2>&1 || \
             gh release create apk --repo "${GITHUB_REPOSITORY}" \
               --title "Клинок и Монеты: Кузница Хаоса — APK" \
