@@ -86,6 +86,19 @@ jobs:
           path: Klinok-i-Monety-Kuznitsa-Khaosa.apk
           if-no-files-found: error
 
+      - name: Publish APK to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          APK="dist/Klinok-i-Monety-Kuznitsa-Khaosa.apk"
+          gh release view apk --repo "${GITHUB_REPOSITORY}" > /dev/null 2>&1 || \
+            gh release create apk --repo "${GITHUB_REPOSITORY}" \
+              --title "Клинок и Монеты: Кузница Хаоса — APK" \
+              --notes "Автосборка ветки ${GITHUB_REF_NAME} (run ${GITHUB_RUN_NUMBER}).\n\nУстановка: скачать APK, разрешить установку из неизвестных источников. Android 7.0+, интернет не нужен."
+          gh release upload apk "${APK}" --repo "${GITHUB_REPOSITORY}" --clobber
+          echo "release uploaded"
+
       - name: Commit APK into dist/
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
