@@ -1,107 +1,112 @@
 package com.byazenb.bladeandcoins;
 
 import android.annotation.SuppressLint;
+import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
+import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.webkit.ConsoleMessage;
 import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
-import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.webkit.WebViewAssetLoader;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.FileInputStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.nio.charset.StandardCharsets;
 
 /**
  * «Клинок и Монеты: Кузница Хаоса»
- * Нативная оболочка: игра лежит в assets и отдаётся через WebViewAssetLoader
- * (нужно, чтобы у страницы был настоящий origin и работал localStorage для сохранений).
- * Всё работает полностью офлайн.
+ * Минималистичная оболочка: только framework WebView, без внешних библиотек.
+ * Игра лежит в assets/www, сохранения пишутся во внутреннюю память через JS-мост.
  */
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends Activity {
 
     private static final String TAG = "BladeAndCoins";
-    private static final String DOMAIN = "appassets.androidplatform.net";
-    private static final String GAME_URL = "https://" + DOMAIN + "/assets/www/index.html";
-    private static final String FALLBACK_URL = "file:///android_asset/www/index.html";
+    private static final String GAME_URL = "file:///android_asset/www/index.html";
+    private static final String SAVE_FILE = "save.json";
+    private static final String CRASH_FILE = "crash.log";
 
     private WebView webView;
-    private WebViewAssetLoader assetLoader;
-    private boolean usedFallback = false;
+    private final Handler ui = new Handler(Looper.getMainLooper());
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Thread.setDefaultUncaughtExceptionHandler(new CrashHandler(this, Thread.getDefaultUncaughtExceptionHandler()));
 
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        hideSystemUi();
+        try {
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
+                    WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        } catch (Throwable t) {
+            Log.w(TAG, "window flags", t);
+        }
 
-        assetLoader = new WebViewAssetLoader.Builder()
-                .setDomain(DOMAIN)
-                .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this))
-                .build();
-
-        webView = new WebView(this);
+        webView = new WebView(getApplicationContext());
+        webView.setLayoutParams(new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         setContentView(webView);
 
-        WebSettings ws = webView.getSettings();
-        ws.setJavaScriptEnabled(true);
-        ws.setDomStorageEnabled(true);
-        ws.setDatabaseEnabled(true);
-        ws.setAllowFileAccess(true);
-        ws.setAllowContentAccess(true);
-        ws.setLoadWithOverviewMode(false);
-        ws.setUseWideViewPort(false);
-        ws.setSupportZoom(false);
-        ws.setBuiltInZoomControls(false);
-        ws.setDisplayZoomControls(false);
-        ws.setMediaPlaybackRequiresUserGesture(false);
-        ws.setCacheMode(WebSettings.LOAD_DEFAULT);
-        ws.setTextZoom(100);
         try {
-            ws.setOffscreenPreRaster(true);
-        } catch (Throwable ignored) { }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            ws.setSafeBrowsingEnabled(false);
+            WebSettings ws = webView.getSettings();
+            ws.setJavaScriptEnabled(true);
+            ws.setDomStorageEnabled(true);
+            ws.setDatabaseEnabled(true);
+            ws.setAllowFileAccess(true);
+            ws.setAllowContentAccess(true);
+            ws.setAllowFileAccessFromFileURLs(true);
+            ws.setAllowUniversalAccessFromFileURLs(true);
+            ws.setLoadWithOverviewMode(false);
+            ws.setUseWideViewPort(false);
+            ws.setSupportZoom(false);
+            ws.setBuiltInZoomControls(false);
+            ws.setDisplayZoomControls(false);
+            ws.setMediaPlaybackRequiresUserGesture(false);
+            ws.setCacheMode(WebSettings.LOAD_DEFAULT);
+            ws.setTextZoom(100);
+            try {
+                ws.setOffscreenPreRaster(true);
+            } catch (Throwable ignored) { }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                ws.setSafeBrowsingEnabled(false);
+            }
+        } catch (Throwable t) {
+            Log.e(TAG, "web settings", t);
         }
 
         webView.setBackgroundColor(0xFF0D0518);
         webView.setHorizontalScrollBarEnabled(false);
         webView.setVerticalScrollBarEnabled(false);
-        webView.setScrollBarStyle(View.SCROLLBARS_OUTSIDE_OVERLAY);
         webView.addJavascriptInterface(new GameBridge(), "AndroidBridge");
 
         webView.setWebViewClient(new WebViewClient() {
-
-            @Nullable
-            @Override
-            public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
-                if (assetLoader != null) {
-                    WebResourceResponse r = assetLoader.shouldInterceptRequest(request.getUrl());
-                    if (r != null) return r;
-                }
-                return super.shouldInterceptRequest(view, request);
-            }
-
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri uri = request.getUrl();
                 String s = uri.toString();
-                if (s.startsWith("https://" + DOMAIN + "/") || s.startsWith("file:///android_asset/")) return false;
+                if (s.startsWith("file:///android_asset/")) return false;
                 try {
                     startActivity(new Intent(Intent.ACTION_VIEW, uri));
                 } catch (ActivityNotFoundException e) {
@@ -112,131 +117,220 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onPageFinished(WebView view, String url) {
-                super.onPageFinished(view, url);
-                hideSystemUi();
-            }
-
-            @Override
-            public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
-                super.onReceivedError(view, errorCode, description, failingUrl);
-                Log.w(TAG, "load error " + errorCode + " " + description + " " + failingUrl);
-                if (!usedFallback && GAME_URL.equals(failingUrl)) {
-                    usedFallback = true;
-                    Log.w(TAG, "fallback to file://");
-                    view.loadUrl(FALLBACK_URL);
-                }
+                Log.d(TAG, "page finished: " + url);
             }
         });
 
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public boolean onConsoleMessage(ConsoleMessage cm) {
-                Log.d(TAG, "JS[" + cm.lineNumber() + "]: " + cm.message());
+                Log.d(TAG, "JS: " + cm.message());
                 return true;
             }
         });
 
-        if (savedInstanceState != null) {
-            webView.restoreState(savedInstanceState);
-        } else {
-            webView.loadUrl(GAME_URL);
-        }
+        webView.loadUrl(GAME_URL);
 
-        getWindow().getDecorView().setOnSystemUiVisibilityChangeListener(visibility -> hideSystemUi());
-    }
-
-    private void hideSystemUi() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            getWindow().setDecorFitsSystemWindows(false);
-            if (getWindow().getInsetsController() != null) {
-                getWindow().getInsetsController().hide(
-                        android.view.WindowInsets.Type.statusBars() | android.view.WindowInsets.Type.navigationBars());
-                getWindow().getInsetsController().setSystemBarsBehavior(
-                        android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
-            }
-        } else {
-            getWindow().getDecorView().setSystemUiVisibility(
-                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                            | View.SYSTEM_UI_FLAG_FULLSCREEN
-                            | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                            | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                            | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                            | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
+        File crash = new File(getFilesDir(), CRASH_FILE);
+        if (crash.exists() && crash.length() > 0) {
+            String text = readFile(crash);
+            crash.delete();
+            showCrashDialog(text);
         }
     }
 
-    @Override
-    protected void onSaveInstanceState(@NonNull Bundle outState) {
-        super.onSaveInstanceState(outState);
-        if (webView != null) webView.saveState(outState);
+    private void showCrashDialog(String text) {
+        try {
+            ScrollView sv = new ScrollView(this);
+            LinearLayout ll = new LinearLayout(this);
+            ll.setOrientation(LinearLayout.VERTICAL);
+            ll.setPadding(32, 32, 32, 32);
+            TextView tv = new TextView(this);
+            tv.setText("Прошлый запуск упал:\n\n" + text);
+            tv.setTextIsSelectable(true);
+            tv.setTextSize(11f);
+            ll.addView(tv);
+            sv.addView(ll);
+            new AlertDialog.Builder(this)
+                    .setTitle("Отчёт об ошибке")
+                    .setView(sv)
+                    .setPositiveButton("OK", null)
+                    .show();
+        } catch (Throwable t) {
+            Log.w(TAG, "crash dialog", t);
+        }
     }
 
     @Override
     protected void onPause() {
         super.onPause();
         if (webView != null) {
-            webView.evaluateJavascript("try{ if(window.ST) ST.save(); }catch(e){}", null);
+            try {
+                webView.evaluateJavascript("try{ if(window.ST) ST.save(); }catch(e){}", null);
+            } catch (Throwable ignored) { }
         }
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        hideSystemUi();
-        if (webView != null) webView.resumeTimers();
     }
 
     @Override
     protected void onDestroy() {
         if (webView != null) {
-            webView.stopLoading();
-            webView.destroy();
+            try {
+                webView.stopLoading();
+                webView.destroy();
+            } catch (Throwable ignored) { }
         }
         super.onDestroy();
     }
 
-    /** «Назад»: сначала отдаём событие игре (закрыть модалку / выйти из раздела). */
     @Override
     public void onBackPressed() {
         if (webView == null) {
             super.onBackPressed();
             return;
         }
-        webView.evaluateJavascript(
-                "(function(){ try { return (window.onBackPressed && window.onBackPressed()) ? 'true' : 'false'; } catch(e) { return 'false'; } })()",
-                new ValueCallback<String>() {
-                    @Override
-                    public void onReceiveValue(String value) {
-                        if (value == null || !value.contains("true")) {
-                            runOnUiThread(new Runnable() {
-                                @Override
-                                public void run() {
-                                    moveTaskToBack(true);
-                                }
-                            });
+        try {
+            webView.evaluateJavascript(
+                    "(function(){ try { return (window.onBackPressed && window.onBackPressed()) ? 'true' : 'false'; } catch(e) { return 'false'; } })()",
+                    new ValueCallback<String>() {
+                        @Override
+                        public void onReceiveValue(String value) {
+                            if (value == null || !value.contains("true")) {
+                                ui.post(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        moveTaskToBack(true);
+                                    }
+                                });
+                            }
                         }
-                    }
-                });
+                    });
+        } catch (Throwable t) {
+            moveTaskToBack(true);
+        }
     }
 
-    /** Мост для JS: вибро и тосты. */
+    /* ======================= JS bridge ======================= */
     private class GameBridge {
+
+        @JavascriptInterface
+        public void saveGame(String data) {
+            try {
+                File dir = getFilesDir();
+                File tmp = new File(dir, SAVE_FILE + ".tmp");
+                File dst = new File(dir, SAVE_FILE);
+                FileOutputStream out = new FileOutputStream(tmp);
+                out.write(data.getBytes(StandardCharsets.UTF_8));
+                out.close();
+                if (!tmp.renameTo(dst)) {
+                    // если rename не сработал — пишем напрямую
+                    FileOutputStream o2 = new FileOutputStream(dst);
+                    o2.write(data.getBytes(StandardCharsets.UTF_8));
+                    o2.close();
+                    tmp.delete();
+                }
+            } catch (Throwable t) {
+                Log.e(TAG, "saveGame", t);
+            }
+        }
+
+        @JavascriptInterface
+        public String loadSave() {
+            try {
+                File f = new File(getFilesDir(), SAVE_FILE);
+                if (!f.exists()) return "";
+                int len = (int) f.length();
+                byte[] buf = new byte[len];
+                FileInputStream in = new FileInputStream(f);
+                int read = 0;
+                while (read < len) {
+                    int r = in.read(buf, read, len - read);
+                    if (r <= 0) break;
+                    read += r;
+                }
+                in.close();
+                return new String(buf, 0, read, StandardCharsets.UTF_8);
+            } catch (Throwable t) {
+                Log.e(TAG, "loadSave", t);
+                return "";
+            }
+        }
+
+        @JavascriptInterface
+        public void toast(final String msg) {
+            ui.post(new Runnable() {
+                @Override
+                public void run() {
+                    Toast.makeText(MainActivity.this, msg, Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+
         @JavascriptInterface
         public void vibrate(int ms) {
-            runOnUiThread(() -> {
-                android.os.Vibrator v = (android.os.Vibrator) getSystemService(android.content.Context.VIBRATOR_SERVICE);
+            try {
+                android.os.Vibrator v = (android.os.Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
                 if (v == null) return;
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     v.vibrate(android.os.VibrationEffect.createOneShot(Math.max(10, ms), 120));
                 } else {
                     v.vibrate(Math.max(10, ms));
                 }
-            });
+            } catch (Throwable ignored) { }
         }
 
         @JavascriptInterface
-        public void toast(String msg) {
-            runOnUiThread(() -> Toast.makeText(MainActivity.this, msg, Toast.LENGTH_SHORT).show());
+        public int getVersionCode() {
+            try {
+                return getPackageManager().getPackageInfo(getPackageName(), 0).versionCode;
+            } catch (Throwable t) {
+                return 0;
+            }
+        }
+    }
+
+    /* ======================= utils ======================= */
+    private static String readFile(File f) {
+        try {
+            int len = (int) f.length();
+            if (len > 20000) len = 20000;
+            byte[] buf = new byte[len];
+            FileInputStream in = new FileInputStream(f);
+            int read = 0;
+            while (read < len) {
+                int r = in.read(buf, read, len - read);
+                if (r <= 0) break;
+                read += r;
+            }
+            in.close();
+            return new String(buf, 0, read, StandardCharsets.UTF_8);
+        } catch (Throwable t) {
+            return "не удалось прочитать лог: " + t;
+        }
+    }
+
+    private static class CrashHandler implements Thread.UncaughtExceptionHandler {
+        private final Context ctx;
+        private final Thread.UncaughtExceptionHandler prev;
+
+        CrashHandler(Context ctx, Thread.UncaughtExceptionHandler prev) {
+            this.ctx = ctx.getApplicationContext();
+            this.prev = prev;
+        }
+
+        @Override
+        public void uncaughtException(Thread t, Throwable e) {
+            try {
+                StringWriter sw = new StringWriter();
+                PrintWriter pw = new PrintWriter(sw);
+                pw.append("Device: ").append(Build.MANUFACTURER).append(' ').append(Build.MODEL)
+                        .append(" | API ").append(String.valueOf(Build.VERSION.SDK_INT)).append('\n');
+                e.printStackTrace(pw);
+                pw.flush();
+                FileOutputStream out = ctx.openFileOutput(CRASH_FILE, Context.MODE_PRIVATE);
+                out.write(sw.toString().getBytes(StandardCharsets.UTF_8));
+                out.close();
+            } catch (Throwable ignored) { }
+            if (prev != null) prev.uncaughtException(t, e);
         }
     }
 }

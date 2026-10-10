@@ -158,10 +158,30 @@ var U = (function () {
 
   /* ---------- storage ---------- */
   var mem = {};
+  /* В Android-оболочке сохранение идёт через нативный мост (надёжнее localStorage) */
+  function bridge() {
+    try {
+      if (typeof window !== 'undefined' && window.AndroidBridge && typeof window.AndroidBridge.saveGame === 'function') return window.AndroidBridge;
+    } catch (e) { }
+    return null;
+  }
   var store = {
-    get: function (k) { try { return window.localStorage.getItem(k); } catch (e) { return mem[k] || null; } },
-    set: function (k, v) { try { window.localStorage.setItem(k, v); } catch (e) { mem[k] = v; } },
-    del: function (k) { try { window.localStorage.removeItem(k); } catch (e) { delete mem[k]; } }
+    get: function (k) {
+      var b = bridge();
+      if (b) { try { var v = b.loadSave(); if (v && v !== 'undefined') return v; return null; } catch (e) { } }
+      try { return window.localStorage.getItem(k); } catch (e) { return mem[k] || null; }
+    },
+    set: function (k, v) {
+      var b = bridge();
+      if (b) { try { b.saveGame(v); return; } catch (e) { } }
+      try { window.localStorage.setItem(k, v); } catch (e) { mem[k] = v; }
+    },
+    del: function (k) {
+      var b = bridge();
+      if (b) { try { b.saveGame(''); return; } catch (e) { } }
+      try { window.localStorage.removeItem(k); } catch (e) { delete mem[k]; }
+    },
+    isNative: function () { return !!bridge(); }
   };
 
   /* ---------- misc ---------- */

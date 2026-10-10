@@ -27,8 +27,10 @@
 
     /* проверка, что сохранения вообще работают */
     try {
-      window.localStorage.setItem('__bc_test__', '1');
-      window.localStorage.removeItem('__bc_test__');
+      if (!U.store.isNative()) {
+        window.localStorage.setItem('__bc_test__', '1');
+        window.localStorage.removeItem('__bc_test__');
+      }
     } catch (e) {
       setTimeout(function () { U.toast('⚠️ Хранилище недоступно — прогресс не сохранится', 'big', true); }, 1500);
     }
@@ -89,6 +91,15 @@
     /* квесты и достижения — реже */
     if (acc > 2) { acc = 0; ST.checkAch(); ST.checkTitles(); }
   }
+
+  /* глобальный перехват ошибок — чтобы игра не «молча» умирала */
+  window.addEventListener('error', function (ev) {
+    try {
+      var msg = '⚠️ ' + (ev.message || 'ошибка') + ' (' + (ev.filename || '').split('/').pop() + ':' + ev.lineno + ')';
+      console.error(msg);
+      if (window.U) U.toast(msg, null, true);
+    } catch (e) { }
+  });
 
   /* ---------- системное ---------- */
   document.addEventListener('visibilitychange', function () {
