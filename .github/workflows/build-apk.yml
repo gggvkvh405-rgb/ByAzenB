@@ -81,3 +81,19 @@ jobs:
           name: blade-and-coins-apk
           path: Klinok-i-Monety-Kuznitsa-Khaosa.apk
           if-no-files-found: error
+
+      - name: Commit APK into dist/
+        run: |
+          set -e
+          mkdir -p dist
+          cp Klinok-i-Monety-Kuznitsa-Khaosa.apk dist/blade-and-coins.apk
+          rm -f dist/*.sha1
+          sha1sum dist/blade-and-coins.apk | awk '{print $1}' > dist/blade-and-coins.apk.sha1
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git pull --rebase --autostash origin "${GITHUB_REF_NAME}" || true
+          git add -f dist
+          if git diff --cached --quiet; then echo "APK не изменился"; else
+            git commit -m "APK: сборка run ${GITHUB_RUN_NUMBER}"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
