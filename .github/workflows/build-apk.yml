@@ -21,7 +21,23 @@ jobs:
           java-version: '17'
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        run: |
+          set -e
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          echo "ANDROID_HOME=$SDK" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=$SDK" >> $GITHUB_ENV
+          echo "sdk=$SDK"
+          ls "$SDK" || true
+          MGR=""
+          for c in "$SDK/cmdline-tools/latest/bin/sdkmanager" "$SDK/tools/bin/sdkmanager" "$(command -v sdkmanager || true)"; do
+            if [ -n "$c" ] && [ -x "$c" ]; then MGR="$c"; break; fi
+          done
+          echo "sdkmanager=$MGR"
+          if [ -n "$MGR" ]; then
+            yes 2>/dev/null | "$MGR" --licenses > /dev/null 2>&1 || true
+            "$MGR" "platforms;android-34" "build-tools;34.0.0" "platform-tools" > /dev/null 2>&1 || true
+          fi
+          ls "$SDK/platforms" "$SDK/build-tools" || true
 
       - name: Install Gradle 8.2
         run: |
