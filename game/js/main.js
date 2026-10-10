@@ -14,6 +14,14 @@
     Combat.startWave(S.wave || 1, true);
     Combat.C.hero.hp = Combat.C.hero.maxHp;
 
+    /* проверка, что сохранения вообще работают */
+    try {
+      window.localStorage.setItem('__bc_test__', '1');
+      window.localStorage.removeItem('__bc_test__');
+    } catch (e) {
+      setTimeout(function () { U.toast('⚠️ Хранилище недоступно — прогресс не сохранится', 'big', true); }, 1500);
+    }
+
     /* стартовый экран */
     var fill = document.getElementById('boot-fill');
     var startBtn = document.getElementById('boot-start');

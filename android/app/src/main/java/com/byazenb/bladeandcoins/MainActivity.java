@@ -1,16 +1,12 @@
 package com.byazenb.bladeandcoins;
 
 import android.annotation.SuppressLint;
-import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
 import android.util.Log;
-import android.view.KeyEvent;
 import android.view.View;
 import android.view.WindowManager;
 import android.webkit.ConsoleMessage;
@@ -18,25 +14,33 @@ import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
 
-import androidx.annotation.RequiresApi;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.webkit.WebViewAssetLoader;
 
 /**
  * «Клинок и Монеты: Кузница Хаоса»
- * Нативная оболочка: WebView с игрой из assets (работает полностью офлайн).
+ * Нативная оболочка: игра лежит в assets и отдаётся через WebViewAssetLoader
+ * (нужно, чтобы у страницы был настоящий origin и работал localStorage для сохранений).
+ * Всё работает полностью офлайн.
  */
 public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "BladeAndCoins";
-    private static final String GAME_URL = "file:///android_asset/www/index.html";
+    private static final String DOMAIN = "appassets.androidplatform.net";
+    private static final String GAME_URL = "https://" + DOMAIN + "/assets/www/index.html";
+    private static final String FALLBACK_URL = "file:///android_asset/www/index.html";
 
     private WebView webView;
-    private boolean webHandledBack = false;
+    private WebViewAssetLoader assetLoader;
+    private boolean usedFallback = false;
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -45,6 +49,11 @@ public class MainActivity extends AppCompatActivity {
 
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         hideSystemUi();
+
+        assetLoader = new WebViewAssetLoader.Builder()
+                .setDomain(DOMAIN)
+                .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this))
+                .build();
 
         webView = new WebView(this);
         setContentView(webView);
@@ -62,8 +71,6 @@ public class MainActivity extends AppCompatActivity {
         ws.setDisplayZoomControls(false);
         ws.setMediaPlaybackRequiresUserGesture(false);
         ws.setCacheMode(WebSettings.LOAD_DEFAULT);
-        ws.setLayoutAlgorithm(WebSettings.LayoutAlgorithm.TEXT_AUTOSIZING);
-        ws.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         ws.setTextZoom(100);
         try {
             ws.setOffscreenPreRaster(true);
@@ -73,20 +80,30 @@ public class MainActivity extends AppCompatActivity {
         }
 
         webView.setBackgroundColor(0xFF0D0518);
-        webView.setScrollBarStyle(View.SCROLLBARS_OUTSIDE_OVERLAY);
         webView.setHorizontalScrollBarEnabled(false);
         webView.setVerticalScrollBarEnabled(false);
+        webView.setScrollBarStyle(View.SCROLLBARS_OUTSIDE_OVERLAY);
         webView.addJavascriptInterface(new GameBridge(), "AndroidBridge");
 
         webView.setWebViewClient(new WebViewClient() {
+
+            @Nullable
+            @Override
+            public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                if (assetLoader != null) {
+                    WebResourceResponse r = assetLoader.shouldInterceptRequest(request.getUrl());
+                    if (r != null) return r;
+                }
+                return super.shouldInterceptRequest(view, request);
+            }
+
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri uri = request.getUrl();
                 String s = uri.toString();
-                if (s.startsWith("file:///android_asset/")) return false;
+                if (s.startsWith("https://" + DOMAIN + "/") || s.startsWith("file:///android_asset/")) return false;
                 try {
-                    Intent i = new Intent(Intent.ACTION_VIEW, uri);
-                    startActivity(i);
+                    startActivity(new Intent(Intent.ACTION_VIEW, uri));
                 } catch (ActivityNotFoundException e) {
                     Log.w(TAG, "cannot open " + s);
                 }
@@ -97,6 +114,17 @@ public class MainActivity extends AppCompatActivity {
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 hideSystemUi();
+            }
+
+            @Override
+            public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
+                super.onReceivedError(view, errorCode, description, failingUrl);
+                Log.w(TAG, "load error " + errorCode + " " + description + " " + failingUrl);
+                if (!usedFallback && GAME_URL.equals(failingUrl)) {
+                    usedFallback = true;
+                    Log.w(TAG, "fallback to file://");
+                    view.loadUrl(FALLBACK_URL);
+                }
             }
         });
 
@@ -114,7 +142,6 @@ public class MainActivity extends AppCompatActivity {
             webView.loadUrl(GAME_URL);
         }
 
-        // Тряска / звук из JS (опционально)
         getWindow().getDecorView().setOnSystemUiVisibilityChangeListener(visibility -> hideSystemUi());
     }
 
@@ -139,7 +166,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
-    protected void onSaveInstanceState(Bundle outState) {
+    protected void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
         if (webView != null) webView.saveState(outState);
     }
@@ -168,14 +195,13 @@ public class MainActivity extends AppCompatActivity {
         super.onDestroy();
     }
 
-    /** Кнопка «Назад»: сначала отдаём её игре (закрыть модалку / вернуться на экран боя). */
+    /** «Назад»: сначала отдаём событие игре (закрыть модалку / выйти из раздела). */
     @Override
     public void onBackPressed() {
         if (webView == null) {
             super.onBackPressed();
             return;
         }
-        webHandledBack = false;
         webView.evaluateJavascript(
                 "(function(){ try { return (window.onBackPressed && window.onBackPressed()) ? 'true' : 'false'; } catch(e) { return 'false'; } })()",
                 new ValueCallback<String>() {
@@ -193,15 +219,16 @@ public class MainActivity extends AppCompatActivity {
                 });
     }
 
-    /** Мост для JS (вибро и т.п.) */
+    /** Мост для JS: вибро и тосты. */
     private class GameBridge {
         @JavascriptInterface
         public void vibrate(int ms) {
             runOnUiThread(() -> {
                 android.os.Vibrator v = (android.os.Vibrator) getSystemService(android.content.Context.VIBRATOR_SERVICE);
-                if (v != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                if (v == null) return;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     v.vibrate(android.os.VibrationEffect.createOneShot(Math.max(10, ms), 120));
-                } else if (v != null) {
+                } else {
                     v.vibrate(Math.max(10, ms));
                 }
             });
