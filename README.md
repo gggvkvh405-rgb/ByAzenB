@@ -62,6 +62,12 @@ android/                  нативный Android-проект (WebView-обо�
 .github/workflows/build-apk.yml   CI: сборка APK через Gradle
 ```
 
+## Готовый APK
+
+`dist/Klinok-i-Monety-Kuznitsa-Khaosa.apk` — debug-сборка (~9 МБ), обновляется автоматически
+на каждый пуш (GitHub Actions). Скачайте файл на телефон, разрешите установку из неизвестных
+источников и установите. `minSdk = 24` (Android 7.0+), интернет не нужен.
+
 ## Сборка APK
 
 APK собирается в GitHub Actions (нужен Android SDK + JDK, в песочнице они недоступны):
