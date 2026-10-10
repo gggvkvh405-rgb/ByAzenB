@@ -14,6 +14,17 @@
     Combat.startWave(S.wave || 1, true);
     Combat.C.hero.hp = Combat.C.hero.maxHp;
 
+    /* стартовый ржавый меч для совсем нового игрока */
+    if (!S.equip.weapon && S.kills === 0 && Object.keys(S.collection).length === 0) {
+      var starter = LOOT.makeItem(0, 'weapon', 0);
+      starter.name = 'Ржавый меч';
+      starter.e = { dmg: 5 };
+      starter.icon = '🗡️';
+      S.equip.weapon = starter;
+      S.collection['Ржавый меч|weapon'] = 1;
+      Combat.syncHero();
+    }
+
     /* проверка, что сохранения вообще работают */
     try {
       window.localStorage.setItem('__bc_test__', '1');
