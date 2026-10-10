@@ -74,9 +74,9 @@ jobs:
           path: gradle-build.log
           if-no-files-found: warn
 
-      - name: Rename artifact
+      - name: Rename APK
         run: |
-          cp android/app/build/outputs/apk/debug/app-debug.apk "Klinok-i-Monety-Kuznitsa-Khaosa.apk"
+          cp android/app/build/outputs/apk/debug/app-debug.apk Klinok-i-Monety-Kuznitsa-Khaosa.apk
           ls -la *.apk
 
       - name: Upload APK
@@ -93,8 +93,8 @@ jobs:
         run: |
           set +e
           mkdir -p dist
-          cp Klinok-i-Monety-Kuznitsa-Khaosa.apk dist/blade-and-coins.apk
-          sha1sum dist/blade-and-coins.apk | awk '{print $1}' > dist/blade-and-coins.apk.sha1
+          rm -f dist/blade-and-coins.apk dist/blade-and-coins.apk.sha1
+          cp Klinok-i-Monety-Kuznitsa-Khaosa.apk dist/
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -f dist
